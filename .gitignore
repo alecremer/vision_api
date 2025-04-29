@@ -1,0 +1,10 @@
+data
+__pycache__
+dataset_seg_raw
+test_seg
+sam_b.pt
+yolo11n.pt
+yolo11n-seg.pt
+logs
+*.pyc
+*/runs*
