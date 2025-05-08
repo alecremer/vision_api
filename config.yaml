@@ -1,4 +1,5 @@
 subestacao:
+<<<<<<< HEAD
  
   dataset: /home/ale/datasets/subestacao
   weights: /home/ale/datasets/subestacao/runs/run_500_epochs/weights/best.pt
@@ -25,3 +26,16 @@ subestacao:
     'barra'
     ]
   
+=======
+
+  dataset: /home/ale/Downloads/ale/dataset
+  weights: 
+  confidence: 0.1
+  label: subestacao
+  epochs: 50
+  device: cpu
+  result_folder_name: run_300_epochs
+  model: yolo11n.pt
+  train: true
+  detect: false
+>>>>>>> 260c9fd82e0819769cd3c907fa36943028156b32
