@@ -1,28 +1,27 @@
-sample_object:
-
-  dataset: /path_to_object/dataset
-  weights: /path_to_object/dataset/runs/run_300_epochs/weights/best.pt
+subestacao:
+ 
+  dataset: /home/ale/datasets/subestacao
+  weights: /home/ale/datasets/subestacao/runs/run_500_epochs/weights/best.pt
   confidence: 0.1
-  label: sample_object
-  epochs: 300
-  device: cpu
-  result_folder_name: run_300_epochs
+  label: subestacao
+  epochs: 500
+  device: 0
+  result_folder_name: run_500_epochs
   model: yolo11n.pt
-  train: false
-  detect: true
-
-
-sample_object_segmentation:
-
-  dataset: /path_to_object_seg/dataset/sample_object_segmentation
-  weights: /path_to_object_seg/dataset/sample_object_segmentation/runs/run_300_epochs/weights/best.pt
-  confidence: 0.5
-  label: sample_object_segmentation
-  epochs: 300
-  device: cpu
-  result_folder_name: run_300_epochs
-  model: yolo11n-seg.pt
-  train: false
+  train: true
   detect: false
-  segmentation: true
-
+  annotate: true
+  annotate_confidence: 0.1 
+  labels_to_annotate:  
+    ['disjuntor',
+    'painel_eletrico',
+    'seccionadora',
+    'canaleta',
+    'poste',
+    'reator_de_barra',
+    'transformador_de_corrente',
+    'transformador_de_potencial',
+    'isolador_pedestal',
+    'barra'
+    ]
+  

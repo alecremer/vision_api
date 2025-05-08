@@ -28,6 +28,9 @@ class cli_parser:
         # Test mode
         test_parser = subparsers.add_parser("test", help="test mode")
 
+        annotate_parser = subparsers.add_parser("annotate", help="annotate mode")
+        annotate_parser.add_argument("-p", "--path", type=str, help="folder to images to annotate")
+
         args = parser.parse_args()
 
         return args

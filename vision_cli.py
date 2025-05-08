@@ -1,6 +1,6 @@
 import multiprocessing
 from typing import List
-from vision import Vision, DetectModelConfig, TrainModelConfig, DetectConfig
+from vision import Vision, DetectModelConfig, TrainModelConfig, DetectConfig, AnnotateModelConfig
 from vision_runner import VisionRunner
 from cli_parser import cli_parser
 from metrics import Metrics
@@ -47,7 +47,11 @@ class VisionCLI:
 
             elif self.args.run_mode == "train":
                 vision_runner.train( file_config_or_path)    
-
+            
+            elif self.args.run_mode == "annotate":
+                img_path = self.args.path
+                vision_runner.annotate(img_path, file_config_or_path)
+            
             elif self.args.run_mode == "live":
 
                 

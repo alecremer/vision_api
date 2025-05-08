@@ -3,9 +3,10 @@ import cv2
 import math
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List
+from typing import List, Tuple
 import logging
 import numpy as np
+import os
 
 @dataclass
 class DetectConfig:
@@ -30,6 +31,20 @@ class DetectModelConfig:
     confidence: float
     device: str
     segmentation: bool = False
+
+@dataclass
+class AnnotateModelConfig:
+
+    weights_path: str
+    labels_to_annotate: str
+    annotate_confidence: float
+
+@dataclass
+class BoundingBox:
+
+    label: str
+    box: Tuple[int, int, int, int]
+    confidence: float
 
 
 @dataclass
@@ -88,6 +103,106 @@ class Vision:
         
         model_trained = YOLO(weight_path)
         result = model_trained.predict(test_path, show=show)[0]
+
+    def _mouse_click_annotate_callback(self, event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            for i, box in enumerate(self.boxes):
+                x1, y1, x2, y2 = box
+                if x1 <= x <= x2 and y1 <= y <= y2:
+                    print("dentro")
+                    self.boxes.pop(i)
+                    cv2.rectangle(self.current_img, (int(x1), int(y1)), (int(x2), int(y2)), (150, 150, 150), 3)
+                    cv2.imshow('image to annotate', self.current_img)
+
+
+    def annotate(self, img_path: str, annotate_model_config: List[AnnotateModelConfig]):
+
+        print("Start annotation")
+        weight_paths = []
+        labels_to_annotate = []
+        annotate_confidence = []
+        segmentation = []
+
+
+        print("annotate for classe: ")
+        for annotate_cfg in annotate_model_config:
+
+            weight_paths.append(annotate_cfg.weights_path)
+            labels_to_annotate.append(annotate_cfg.labels_to_annotate)
+            annotate_confidence.append(annotate_cfg.annotate_confidence)
+
+            print(annotate_cfg.labels_to_annotate)
+
+        models_trained = self._set_trained_models(weight_paths)
+
+
+        folder_list = os.listdir(img_path)
+        has_files = len(folder_list) > 0
+        self.file_index = 0
+        cv2.namedWindow("image to annotate")
+        cv2.setMouseCallback("image to annotate", self._mouse_click_annotate_callback)
+        
+        # classified
+        # for file in os.listdir(img_path):
+        #     index = 0
+        #     img = cv2.imread(os.path.join(img_path, file))
+
+        #     for m in models_trained:
+        #         result = m(img, conf=annotate_confidence[index])
+        #         boxes = self.create_bounding_box_to_annotate(result, img, labels_to_annotate[index])
+        #         self.image_box.append([img, boxes])
+
+        self.images_bounding_boxes = []
+        while has_files:
+            
+            
+            file = folder_list[self.file_index]
+            img_original = cv2.imread(os.path.join(img_path, file))
+            img = img_original.copy()
+
+            if img is not None:
+                
+                index = 0
+                if not has_files:
+                    print("empty folder")
+                    break
+                
+                img_boxes = []
+                
+                for m in models_trained:
+                    result = m(img, conf=annotate_confidence[index])
+                    bounding_boxes = self.result_to_bounding_box(result, labels_to_annotate[index])
+                    img_boxes.append(bounding_boxes)
+                    # boxes = self.create_bounding_box_to_annotate(result, img, labels_to_annotate[index])
+                self.images_bounding_boxes.append((img_original, img_boxes))
+
+                img = img_original.copy()
+                self.current_img = img
+                for bb in (self.images_bounding_boxes[self.file_index])[1]:
+                    self.bounding_box_to_image_box(img, bb)
+                    
+                cv2.imshow('image to annotate', img)
+
+                key = cv2.waitKey(0)
+                if key == 83: # right
+                    self.file_index = self.file_index + 1
+
+                elif key == 81: # left
+                    self.file_index = self.file_index - 1
+
+                    if index < 0:
+                        index = len(folder_list)-1
+                
+                elif key == ord('s') or key == ord('S'):
+                    print("save")
+                    self.file_index = self.file_index + 1
+                
+                elif key == ord('q') or key == ord('Q'):
+                    print("quit")
+                    has_files = False
+            
+
+
 
     def _select_cam_source_(self, source, ip=None, file=None):
 
@@ -234,8 +349,89 @@ class Vision:
 
         cv2.destroyAllWindows()
 
+    
+    def create_bounding_box_to_annotate(self, detection_result, frame, labels_to_annotate = None):
+        boxes_detected = []
+        for r in detection_result:
+            for annotate_index, annotate_label in enumerate(labels_to_annotate):
+                boxes = r.boxes
+                class_indices = boxes.cls
+                boxes_img = []
+
+                for i, class_index in enumerate(class_indices):
+                    class_id = int(class_index)
+
+
+                    if annotate_index == class_id:
+                        label = annotate_label
+                        box = boxes.xyxy[i]
+                        boxes_img.append(box)
+                        
+                        x1, y1, x2, y2 = box
+                        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                        
+                        # put box in cam
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 255), 3)
+
+                        # confidence
+                        confidence = math.ceil((boxes.conf[i]*100))/100
+
+                        # object details
+                        org = [x1, y1]
+                        font = cv2.FONT_HERSHEY_SIMPLEX
+                        fontScale = 1
+                        color = (255, 0, 0)
+                        thickness = 2
+
+                        cv2.putText(frame, label + " " + str(confidence), org, font, fontScale, color, thickness)
+                        boxes_detected.append(box)
+        return boxes_detected
+    
+    def result_to_bounding_box(self, detection_result, labels_to_annotate = None):
+        detected = []
+        for r in detection_result:
+            for annotate_index, annotate_label in enumerate(labels_to_annotate):
+                boxes = r.boxes
+                class_indices = boxes.cls
+
+                for i, class_index in enumerate(class_indices):
+                    class_id = int(class_index)
+
+
+                    if annotate_index == class_id:
+                        label = annotate_label
+                        box = boxes.xyxy[i]
+                        
+                        x1, y1, x2, y2 = box
+                        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                        
+                        # confidence
+                        confidence = math.ceil((boxes.conf[i]*100))/100
+                        bounding_box = BoundingBox(label, box, confidence)
+                        detected.append(BoundingBox)
+        return detected
+
+    def bounding_box_to_image_box(self, img, bounding_boxes: List[BoundingBox]):
+        for bb in bounding_boxes:
+            print(bb.confidence)
+            x1, y1, x2, y2 = bb.box
+            
+            # put box in cam
+            cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 255), 3)
+
+
+            # object details
+            org = [x1, y1]
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            fontScale = 1
+            color = (255, 0, 0)
+            thickness = 2
+
+            cv2.putText(img, bb.label + " " + str(bb.confidence), org, font, fontScale, color, thickness)
+
     def create_bounding_box(self, detection_result, frame, label):
         for r in detection_result:
+
             boxes = r.boxes
 
             for box in boxes:
