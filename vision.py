@@ -40,11 +40,19 @@ class AnnotateModelConfig:
     annotate_confidence: float
 
 @dataclass
-class BoundingBox:
+class BoundingBoxDetected:
 
     label: str
     box: Tuple[int, int, int, int]
     confidence: float
+
+@dataclass
+class AnnotationCell:
+
+    img: np.ndarray
+    original_img: np.ndarray
+    classes_boxes: List[BoundingBoxDetected]
+    excluded_classes_boxes: List[BoundingBoxDetected]
 
 
 @dataclass
@@ -106,13 +114,33 @@ class Vision:
 
     def _mouse_click_annotate_callback(self, event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
-            for i, box in enumerate(self.boxes):
-                x1, y1, x2, y2 = box
-                if x1 <= x <= x2 and y1 <= y <= y2:
-                    print("dentro")
-                    self.boxes.pop(i)
-                    cv2.rectangle(self.current_img, (int(x1), int(y1)), (int(x2), int(y2)), (150, 150, 150), 3)
-                    cv2.imshow('image to annotate', self.current_img)
+            for classes_boxes in self.annotation[self.file_index].classes_boxes:
+                for i, bounding_boxes in enumerate(classes_boxes): 
+                    x1, y1, x2, y2 = bounding_boxes.box
+                    if x1 <= x <= x2 and y1 <= y <= y2:
+                        classes_boxes.pop(i)
+                        cv2.rectangle(self.annotation[self.file_index].img, (int(x1), int(y1)), (int(x2), int(y2)), (150, 150, 150), 3)
+                        cv2.imshow('image to annotate', self.annotation[self.file_index].img)
+
+    def handle_key(self):
+
+        key = cv2.waitKey(0)
+        if key == 83: # right
+            self.file_index = self.file_index + 1
+
+        elif key == 81: # left
+            self.file_index = self.file_index - 1
+
+            if self.file_index < 0:
+                self.file_index = len(self.self.folder_list)-1
+        
+        elif key == ord('s') or key == ord('S'):
+            print("save")
+            self.file_index = self.file_index + 1
+        
+        elif key == ord('q') or key == ord('Q'):
+            print("quit")
+            self.has_files = False
 
 
     def annotate(self, img_path: str, annotate_model_config: List[AnnotateModelConfig]):
@@ -136,8 +164,8 @@ class Vision:
         models_trained = self._set_trained_models(weight_paths)
 
 
-        folder_list = os.listdir(img_path)
-        has_files = len(folder_list) > 0
+        self.folder_list = os.listdir(img_path)
+        self.has_files = len(self.folder_list) > 0
         self.file_index = 0
         cv2.namedWindow("image to annotate")
         cv2.setMouseCallback("image to annotate", self._mouse_click_annotate_callback)
@@ -152,54 +180,45 @@ class Vision:
         #         boxes = self.create_bounding_box_to_annotate(result, img, labels_to_annotate[index])
         #         self.image_box.append([img, boxes])
 
-        self.images_bounding_boxes = []
-        while has_files:
+        # self.images_bounding_boxes: List[Tuple[np.ndarray, List[BoundingBoxDetected], np.ndarray]] = [] # img, list of boxes, original img
+        self.annotation: List[AnnotationCell] = []
+        
+        while self.has_files:
             
+            self.current_annotation : AnnotationCell = None
             
-            file = folder_list[self.file_index]
-            img_original = cv2.imread(os.path.join(img_path, file))
-            img = img_original.copy()
+            # if img not exists
+            if len(self.annotation) < self.file_index +1:
+            
+                file = self.folder_list[self.file_index]
+                img_original = cv2.imread(os.path.join(img_path, file))
+                img = img_original.copy()
 
-            if img is not None:
+                img_boxes = []
+                for i, m in enumerate(models_trained):
+                    result = m(img, conf=annotate_confidence[i])
+                    bounding_boxes = self.result_to_bounding_box(result, labels_to_annotate[i])
+                    img_boxes.append(bounding_boxes)
+                    # boxes = self.create_bounding_box_to_annotate(result, img, labels_to_annotate[index])
+                img = img_original.copy()
                 
-                index = 0
-                if not has_files:
+                self.annotation.append(AnnotationCell(img, img_original, img_boxes, []))
+
+            else:
+                self.current_annotation = self.annotation[self.file_index]
+
+            if self.current_annotation is not None:
+                
+                if not self.has_files:
                     print("empty folder")
                     break
                 
-                img_boxes = []
-                
-                for m in models_trained:
-                    result = m(img, conf=annotate_confidence[index])
-                    bounding_boxes = self.result_to_bounding_box(result, labels_to_annotate[index])
-                    img_boxes.append(bounding_boxes)
-                    # boxes = self.create_bounding_box_to_annotate(result, img, labels_to_annotate[index])
-                self.images_bounding_boxes.append((img_original, img_boxes))
-
-                img = img_original.copy()
-                self.current_img = img
-                for bb in (self.images_bounding_boxes[self.file_index])[1]:
-                    self.bounding_box_to_image_box(img, bb)
+                for bb in self.current_annotation.classes_boxes:
+                    self.bounding_box_to_image_box(self.current_annotation.img, bb)
                     
-                cv2.imshow('image to annotate', img)
+                cv2.imshow('image to annotate', self.current_annotation.img)
 
-                key = cv2.waitKey(0)
-                if key == 83: # right
-                    self.file_index = self.file_index + 1
-
-                elif key == 81: # left
-                    self.file_index = self.file_index - 1
-
-                    if index < 0:
-                        index = len(folder_list)-1
-                
-                elif key == ord('s') or key == ord('S'):
-                    print("save")
-                    self.file_index = self.file_index + 1
-                
-                elif key == ord('q') or key == ord('Q'):
-                    print("quit")
-                    has_files = False
+                self.handle_key()
             
 
 
@@ -407,21 +426,20 @@ class Vision:
                         
                         # confidence
                         confidence = math.ceil((boxes.conf[i]*100))/100
-                        bounding_box = BoundingBox(label, box, confidence)
-                        detected.append(BoundingBox)
+                        bounding_box = BoundingBoxDetected(label, box, confidence)
+                        detected.append(bounding_box)
         return detected
 
-    def bounding_box_to_image_box(self, img, bounding_boxes: List[BoundingBox]):
+    def bounding_box_to_image_box(self, img, bounding_boxes: List[BoundingBoxDetected]):
         for bb in bounding_boxes:
-            print(bb.confidence)
             x1, y1, x2, y2 = bb.box
             
             # put box in cam
-            cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 255), 3)
+            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 255), 3)
 
 
             # object details
-            org = [x1, y1]
+            org = [int(x1), int(y1)]
             font = cv2.FONT_HERSHEY_SIMPLEX
             fontScale = 1
             color = (255, 0, 0)
