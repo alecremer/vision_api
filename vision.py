@@ -1,3 +1,4 @@
+import torch
 from ultralytics import YOLO
 import cv2
 import math
@@ -118,7 +119,14 @@ class Vision:
                 for i, bounding_boxes in enumerate(classes_boxes): 
                     x1, y1, x2, y2 = bounding_boxes.box
                     if x1 <= x <= x2 and y1 <= y <= y2:
-                        if bounding_boxes in self.annotation[self.file_index].excluded_classes_boxes:
+                        
+                        excluded_box = False
+                        for bb in self.annotation[self.file_index].excluded_classes_boxes:
+                            excluded_box =  torch.allclose(bb.box, bounding_boxes.box, atol=1e-3)
+                            if excluded_box:
+                                break
+                            
+                        if excluded_box:
                             self.annotation[self.file_index].excluded_classes_boxes.remove(bounding_boxes)
                         else:
                             self.annotation[self.file_index].excluded_classes_boxes.append(bounding_boxes)
