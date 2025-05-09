@@ -134,6 +134,9 @@ class Vision:
             
         cv2.imshow('image to annotate', self.current_annotation.img)
 
+    def save_annotations(self):
+        pass
+
     def handle_key(self):
 
         key = cv2.waitKey(0)
@@ -144,11 +147,12 @@ class Vision:
             self.file_index = self.file_index - 1
 
             if self.file_index < 0:
-                self.file_index = len(self.self.folder_list)-1
+                self.file_index = 0
+                # self.file_index = len(self.folder_list)-1 future maybe
         
         elif key == ord('s') or key == ord('S'):
             print("save")
-            self.file_index = self.file_index + 1
+            # self.file_index = self.file_index + 1
         
         elif key == ord('q') or key == ord('Q'):
             print("quit")
@@ -177,6 +181,8 @@ class Vision:
 
 
         self.folder_list = os.listdir(img_path)
+        print(f"{len(self.folder_list)} files to annotate")
+
         self.has_files = len(self.folder_list) > 0
         self.file_index = 0
         cv2.namedWindow("image to annotate")
