@@ -50,6 +50,7 @@ class BoundingBoxDetected:
 @dataclass
 class AnnotationCell:
 
+    id: int
     img: np.ndarray
     original_img: np.ndarray
     classes_boxes: List[BoundingBoxDetected]
@@ -215,7 +216,8 @@ class Vision:
             
             # if img not exists
             if len(self.annotation) < self.file_index +1:
-            
+                
+                id = self.file_index
                 file = self.folder_list[self.file_index]
                 img_original = cv2.imread(os.path.join(img_path, file))
                 img = img_original.copy()
@@ -228,7 +230,7 @@ class Vision:
                     # boxes = self.create_bounding_box_to_annotate(result, img, labels_to_annotate[index])
                 img = img_original.copy()
                 
-                self.annotation.append(AnnotationCell(img, img_original, img_boxes, []))
+                self.annotation.append(AnnotationCell(id, img, img_original, img_boxes, []))
 
             else:
                 self.current_annotation = self.annotation[self.file_index]
