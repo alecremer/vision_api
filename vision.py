@@ -96,11 +96,11 @@ class Train:
 
 class Vision:
 
+    excluded_color = (150, 150, 150)
     _train = Train()
 
     def __init__(self):
         logging.getLogger("ultralytics").setLevel(logging.CRITICAL)
-
         pass
 
     def train(self, train_cfg_list: List[TrainModelConfig]): 
@@ -118,9 +118,21 @@ class Vision:
                 for i, bounding_boxes in enumerate(classes_boxes): 
                     x1, y1, x2, y2 = bounding_boxes.box
                     if x1 <= x <= x2 and y1 <= y <= y2:
-                        classes_boxes.pop(i)
-                        cv2.rectangle(self.annotation[self.file_index].img, (int(x1), int(y1)), (int(x2), int(y2)), (150, 150, 150), 3)
-                        cv2.imshow('image to annotate', self.annotation[self.file_index].img)
+                        if bounding_boxes in self.annotation[self.file_index].excluded_classes_boxes:
+                            self.annotation[self.file_index].excluded_classes_boxes.remove(bounding_boxes)
+                        else:
+                            self.annotation[self.file_index].excluded_classes_boxes.append(bounding_boxes)
+                        self.render_annotation()
+                            # cv2.rectangle(self.annotation[self.file_index].img, (int(x1), int(y1)), (int(x2), int(y2)), self.excluded_color, 3)
+                            # cv2.imshow('image to annotate', self.annotation[self.file_index].img)
+
+    def render_annotation(self):
+        for bb in self.current_annotation.classes_boxes:
+            self.bounding_box_to_image_box(self.current_annotation.img, bb)
+        
+        self.bounding_box_to_image_box(self.current_annotation.img, self.current_annotation.excluded_classes_boxes, self.excluded_color)
+            
+        cv2.imshow('image to annotate', self.current_annotation.img)
 
     def handle_key(self):
 
@@ -213,10 +225,7 @@ class Vision:
                     print("empty folder")
                     break
                 
-                for bb in self.current_annotation.classes_boxes:
-                    self.bounding_box_to_image_box(self.current_annotation.img, bb)
-                    
-                cv2.imshow('image to annotate', self.current_annotation.img)
+                self.render_annotation()
 
                 self.handle_key()
             
@@ -430,22 +439,23 @@ class Vision:
                         detected.append(bounding_box)
         return detected
 
-    def bounding_box_to_image_box(self, img, bounding_boxes: List[BoundingBoxDetected]):
+    def bounding_box_to_image_box(self, img, bounding_boxes: List[BoundingBoxDetected], color = (255, 0, 255)):
         for bb in bounding_boxes:
             x1, y1, x2, y2 = bb.box
             
             # put box in cam
-            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 255), 3)
+            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), color, 3)
 
 
             # object details
             org = [int(x1), int(y1)]
             font = cv2.FONT_HERSHEY_SIMPLEX
             fontScale = 1
-            color = (255, 0, 0)
             thickness = 2
+            text_color = (255, 0, 0)
 
-            cv2.putText(img, bb.label + " " + str(bb.confidence), org, font, fontScale, color, thickness)
+
+            cv2.putText(img, bb.label + " " + str(bb.confidence), org, font, fontScale, text_color, thickness)
 
     def create_bounding_box(self, detection_result, frame, label):
         for r in detection_result:
