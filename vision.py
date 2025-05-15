@@ -144,7 +144,16 @@ class Vision:
         cv2.imshow('image to annotate', self.current_annotation.img)
 
     def save_annotations(self):
-        pass
+        # print("id: ", self.annotation[0].id)
+        # print("classes boxes: ", self.annotation[0].classes_boxes)
+        for annotation in self.annotation:
+            for class_box in annotation.classes_boxes:
+                for box in class_box:
+                    x1, y1, x2, y2 = box
+
+        label = self.annotation[0].classes_boxes[0][0].label
+        print(f"{label} {x1} {y1} {x2} {y2}")
+        # for annotation in self.annotation:
 
     def handle_key(self):
 
@@ -161,6 +170,7 @@ class Vision:
         
         elif key == ord('s') or key == ord('S'):
             print("save")
+            self.save_annotations()
             # self.file_index = self.file_index + 1
         
         elif key == ord('q') or key == ord('Q'):
@@ -176,6 +186,7 @@ class Vision:
         annotate_confidence = []
         segmentation = []
 
+        # TODO: Label to number in order
 
         print("annotate for classe: ")
         for annotate_cfg in annotate_model_config:
