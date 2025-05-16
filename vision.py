@@ -50,11 +50,12 @@ class BoundingBoxDetected:
 @dataclass
 class AnnotationCell:
 
-    id: int
+    id: str
     img: np.ndarray
     original_img: np.ndarray
     classes_boxes: List[BoundingBoxDetected]
     excluded_classes_boxes: List[BoundingBoxDetected]
+    valid: bool
 
 
 @dataclass
@@ -127,6 +128,7 @@ class Vision:
                             if excluded_box:
                                 break
                             
+                        # error when users excludes all annotations
                         if excluded_box:
                             self.annotation[self.file_index].excluded_classes_boxes.remove(bounding_boxes)
                         else:
@@ -136,23 +138,53 @@ class Vision:
                             # cv2.imshow('image to annotate', self.annotation[self.file_index].img)
 
     def render_annotation(self):
+        self.current_annotation.img = self.current_annotation.original_img.copy()
         for bb in self.current_annotation.classes_boxes:
             self.bounding_box_to_image_box(self.current_annotation.img, bb)
         
         self.bounding_box_to_image_box(self.current_annotation.img, self.current_annotation.excluded_classes_boxes, self.excluded_color)
-            
+        self.mark_validation_img(self.current_annotation.img, self.current_annotation.valid)
         cv2.imshow('image to annotate', self.current_annotation.img)
 
     def save_annotations(self):
+        
         # print("id: ", self.annotation[0].id)
         # print("classes boxes: ", self.annotation[0].classes_boxes)
-        for annotation in self.annotation:
-            for class_box in annotation.classes_boxes:
-                for box in class_box:
-                    x1, y1, x2, y2 = box
 
-        label = self.annotation[0].classes_boxes[0][0].label
-        print(f"{label} {x1} {y1} {x2} {y2}")
+        # create labels file
+        with open(self.labels_path + "/classes.txt", "w") as f:
+            for label in self.labels:
+                f.write(f"{label}\n")
+
+        files: List[str] = []
+        for annotation in self.annotation:
+            if annotation.valid:
+                with open(self.labels_path + "/" + annotation.id + ".txt", "w") as f:
+                    
+                    h, w = annotation.original_img.shape[:2]
+
+                    for class_box in annotation.classes_boxes:
+                        for box in class_box:
+                            excluded_box = False
+                            for bb in annotation.excluded_classes_boxes:
+                                excluded_box =  torch.allclose(bb.box, box.box, atol=1e-3)
+                                if excluded_box:
+                                    break
+                    
+                            if not excluded_box:
+                                x1, y1, x2, y2 = box.box
+                                x1 = x1/w
+                                x2 = x2/w
+                                y1 = y1/h
+                                y2 = y2/h
+                                label_num = self.labels.index(box.label)
+                                txt_line = f"{label_num} {x1:.6f} {y1:.6f} {x2:.6f} {y2:.6f}\n"
+                                f.write(txt_line)
+                                print(txt_line)
+
+
+        # label = self.annotation[0].classes_boxes[0][0].label
+        # print(f"{label} {x1} {y1} {x2} {y2}")
         # for annotation in self.annotation:
 
     def handle_key(self):
@@ -173,6 +205,15 @@ class Vision:
             self.save_annotations()
             # self.file_index = self.file_index + 1
         
+        elif key == ord('v') or key == ord('V'):
+            print("validate")
+            if self.current_annotation.valid:
+                self.current_annotation.valid = False
+            else:
+                self.current_annotation.valid = True
+            self.render_annotation()
+            # self.file_index = self.file_index + 1
+        
         elif key == ord('q') or key == ord('Q'):
             print("quit")
             self.has_files = False
@@ -180,13 +221,16 @@ class Vision:
 
     def annotate(self, img_path: str, annotate_model_config: List[AnnotateModelConfig]):
 
+        # create save dir
+        self.labels_path = img_path + "/labels"
+        os.makedirs(self.labels_path, exist_ok=True)
+
         print("Start annotation")
         weight_paths = []
         labels_to_annotate = []
         annotate_confidence = []
         segmentation = []
-
-        # TODO: Label to number in order
+        self.labels : List[str] = []
 
         print("annotate for classe: ")
         for annotate_cfg in annotate_model_config:
@@ -196,6 +240,12 @@ class Vision:
             annotate_confidence.append(annotate_cfg.annotate_confidence)
 
             print(annotate_cfg.labels_to_annotate)
+
+        # labels to index
+        for label_list in labels_to_annotate:
+            for label in label_list:
+                if label not in self.labels:
+                    self.labels.append(label)
 
         models_trained = self._set_trained_models(weight_paths)
 
@@ -228,8 +278,8 @@ class Vision:
             # if img not exists
             if len(self.annotation) < self.file_index +1:
                 
-                id = self.file_index
                 file = self.folder_list[self.file_index]
+                id = file.split(".")[0]
                 img_original = cv2.imread(os.path.join(img_path, file))
                 img = img_original.copy()
 
@@ -241,7 +291,7 @@ class Vision:
                     # boxes = self.create_bounding_box_to_annotate(result, img, labels_to_annotate[index])
                 img = img_original.copy()
                 
-                self.annotation.append(AnnotationCell(id, img, img_original, img_boxes, []))
+                self.annotation.append(AnnotationCell(id, img, img_original, img_boxes, [], True))
 
             else:
                 self.current_annotation = self.annotation[self.file_index]
@@ -483,6 +533,18 @@ class Vision:
 
 
             cv2.putText(img, bb.label + " " + str(bb.confidence), org, font, fontScale, text_color, thickness)
+
+    def mark_validation_img(self, img, valid: bool):
+        valid_text = "To Save" if valid else "Discard"
+        color_valid = (0, 255, 0)
+        color_not_valid = (0, 0, 255)
+        color = color_valid if valid else color_not_valid
+        org = [10, 900]
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        fontScale = 1
+        thickness = 2
+        cv2.putText(img, valid_text, org, font, fontScale, color, thickness)
+
 
     def create_bounding_box(self, detection_result, frame, label):
         for r in detection_result:
