@@ -6,7 +6,7 @@
 
 Built as a robust experimentation sandbox, it aims to solve the fragmentation of CV workflows by unifying them into a single, purely local, and scalable environment.
 
-* **Why I Built This
+## Why I Built This
 
 Working with computer vision day to day, I kept running into the same recurring friction:
 
@@ -17,7 +17,7 @@ Working with computer vision day to day, I kept running into the same recurring 
 
 I was spending more energy managing tools than actually developing models. So I built my own framework to unify the entire pipeline — annotation, training, inference, profiling, and deployment — running 100% locally.
 
-### Architecture & Design Philosophy
+## Architecture & Design Philosophy
 This project was built with a focus on maintainability, scalability, and practical utility:
 
 * **Model-Agnostic Core:** The framework's core relies on abstractions and lists, decoupling the logic from specific architectures. This allows seamless integration of new models, enabling side-by-side performance comparisons and A/B testing.
