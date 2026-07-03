@@ -6,6 +6,17 @@
 
 Built as a robust experimentation sandbox, it aims to solve the fragmentation of CV workflows by unifying them into a single, purely local, and scalable environment.
 
+* **Why I Built This
+
+Working with computer vision day to day, I kept running into the same recurring friction:
+
+* Cloud upload limits and slow dataset uploads
+* OS compatibility issues across tools
+* Free annotation tools without AI-assisted labeling
+* Fragmented workflows spread across multiple platforms
+
+I was spending more energy managing tools than actually developing models. So I built my own framework to unify the entire pipeline — annotation, training, inference, profiling, and deployment — running 100% locally.
+
 ### Architecture & Design Philosophy
 This project was built with a focus on maintainability, scalability, and practical utility:
 
@@ -14,6 +25,12 @@ This project was built with a focus on maintainability, scalability, and practic
 * **Full ML Lifecycle Ownership:** By handling annotation (with Active Learning), training, and deployment (inference), it eliminates the need to jump between disjointed tools, demonstrating a complete understanding of MLOps pipelines.
 
 * **Local-First & Unrestricted:** Developed to bypass the limitations of cloud-based proprietary tools (like image caps or OS restrictions), it provides a powerful, uncapped local environment for researchers and engineers.
+
+* **Service Separation: tools** are structured as independent services, reducing coupling and limiting error propagation across modules. The interface is built with OpenCV, but frontend and backend remain separated, so the UI layer can be replaced in the future without touching the system core.
+
+* **Centralized Configuration:** a single config file controls the whole pipeline — enable/disable training, inference, or annotation per model, define architectures and parameters per task, and switch models without modifying the core codebase.
+
+* **Unified CLI:** every mode (live, train, annotate, data processing) runs through one consistent CLI interface, ensuring reproducibility across experiments.
 
 ---
 
